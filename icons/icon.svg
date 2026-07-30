@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Hashcards">
+  <rect width="512" height="512" rx="112" fill="#5b5bd6"/>
+  <!-- a deck: the card behind, then the one you are answering -->
+  <rect x="164" y="114" width="230" height="250" rx="38" fill="none" stroke="#ffffff"
+        stroke-width="22" opacity=".4"/>
+  <rect x="118" y="148" width="230" height="250" rx="38" fill="#5b5bd6"/>
+  <rect x="118" y="148" width="230" height="250" rx="38" fill="#ffffff"/>
+  <!-- and what is on it stays shut -->
+  <circle cx="233" cy="266" r="31" fill="#5b5bd6"/>
+  <path d="M233 288v46" stroke="#5b5bd6" stroke-width="26" stroke-linecap="round"/>
+</svg>
