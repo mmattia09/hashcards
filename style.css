@@ -52,6 +52,10 @@
 
 * { box-sizing: border-box; }
 
+/* Author rules that set `display` would otherwise beat the UA stylesheet and
+ * leave [hidden] elements on screen. Everything here toggles with `hidden`. */
+[hidden] { display: none !important; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
@@ -272,7 +276,13 @@ main {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.card-meta { font-size: .8rem; color: var(--muted); }
+.card-meta {
+  font-size: .8rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .card-meta .dot { opacity: .5; margin: 0 .35rem; }
 .card-actions { display: flex; gap: .1rem; flex: none; }
 
@@ -340,6 +350,8 @@ main {
 }
 
 .hint-area { margin: -.9rem 0 1.2rem; }
+.hint-area .btn { color: var(--accent); background: var(--accent-soft); }
+.hint-area .btn:hover { filter: brightness(.97); }
 .hint {
   display: inline-block;
   margin-top: .3rem;
@@ -350,16 +362,11 @@ main {
   border-radius: 999px;
 }
 
-.password-field { position: relative; display: block; }
-.password-field input { padding-right: 2.9rem; }
-.icon-btn.inline {
-  position: absolute;
-  top: 50%;
-  right: .3rem;
-  transform: translateY(-50%);
-  width: 34px;
-  height: 34px;
-}
+/* The reveal button sits beside the field, not over it: a long value centred in
+ * the input would otherwise spill underneath the icon. */
+.password-field { display: flex; align-items: center; gap: .35rem; }
+.password-field input { flex: 1; min-width: 0; }
+.icon-btn.inline { flex: none; width: 36px; height: 36px; }
 
 input[type="text"], input[type="password"], textarea, select {
   width: 100%;
@@ -396,7 +403,9 @@ select { cursor: pointer; }
 .feedback-title { font-weight: 600; }
 .feedback-help { font-size: .85rem; opacity: .85; }
 
-.study-actions { display: flex; justify-content: space-between; gap: .6rem; margin-top: 1.2rem; }
+/* Skip sits left, Next right — and Next stays right once Skip is gone. */
+.study-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1.2rem; }
+.study-actions #btn-skip { margin-right: auto; }
 .study-actions .btn.primary { min-width: 8rem; }
 
 /* ---------------------------------------------------------------- done */
