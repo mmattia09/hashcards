@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hashcards</title>
+<meta name="description" content="Flashcards for your passwords. Only salted PBKDF2 hashes are stored, never the passwords themselves.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0f14" media="(prefers-color-scheme: dark)">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+
+<noscript class="fatal">
+  <h1>Hashcards needs JavaScript</h1>
+  <p>The whole app runs in your browser — there is no server to fall back on.</p>
+</noscript>
+
+<div id="unsupported" class="fatal" hidden>
+  <h1 data-i18n="unsupported.title">This browser cannot run Hashcards</h1>
+  <p data-i18n="unsupported.body"></p>
+</div>
+
+<div id="app" hidden>
+
+  <header class="topbar">
+    <a class="brand" href="#/" id="link-home">
+      <span class="brand-mark" data-icon="logo" aria-hidden="true"></span>
+      <span class="brand-name">Hashcards</span>
+    </a>
+    <div class="topbar-actions">
+      <button type="button" class="icon-btn" id="btn-theme" data-icon="theme" data-i18n-title="nav.theme" data-i18n-aria="nav.theme"></button>
+      <button type="button" class="icon-btn" id="btn-settings" data-icon="settings" data-i18n-title="nav.settings" data-i18n-aria="nav.settings"></button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ---------------------------------------------------------- home -->
+    <section class="view" id="view-home">
+      <p class="tagline" data-i18n="app.tagline"></p>
+
+      <div class="stats" id="stats">
+        <div class="stat">
+          <span class="stat-value" id="stat-cards">0</span>
+          <span class="stat-label" data-i18n="home.cards"></span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="stat-due">0</span>
+          <span class="stat-label" data-i18n="home.due"></span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="stat-accuracy">—</span>
+          <span class="stat-label" data-i18n="home.accuracy"></span>
+        </div>
+      </div>
+
+      <div class="start-block" id="start-block">
+        <button type="button" class="btn primary block" id="btn-start"></button>
+        <button type="button" class="btn ghost block" id="btn-start-all" data-i18n="home.startAll"></button>
+        <p class="muted center" id="caught-up" data-i18n="home.caughtUp" hidden></p>
+      </div>
+
+      <div class="section-head">
+        <h2 data-i18n="home.list"></h2>
+        <button type="button" class="btn small" id="btn-add">
+          <span data-icon="plus" aria-hidden="true"></span><span data-i18n="home.add"></span>
+        </button>
+      </div>
+
+      <ul class="card-list" id="card-list"></ul>
+
+      <div class="empty" id="empty" hidden>
+        <span class="empty-mark" data-icon="cards" aria-hidden="true"></span>
+        <h3 data-i18n="home.empty.title"></h3>
+        <p data-i18n="home.empty.body"></p>
+        <button type="button" class="btn primary" id="btn-empty-add" data-i18n="home.empty.cta"></button>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------------- study -->
+    <section class="view" id="view-study" hidden>
+      <div class="study-top">
+        <button type="button" class="icon-btn" id="btn-quit" data-icon="close" data-i18n-title="study.quit" data-i18n-aria="study.quit"></button>
+        <div class="progress">
+          <div class="progress-track"><span class="progress-fill" id="progress-fill"></span></div>
+          <span class="progress-label" id="progress-label"></span>
+        </div>
+      </div>
+
+      <div class="flashcard" id="flashcard">
+        <p class="question" data-i18n="study.question"></p>
+        <h2 class="account" id="study-name"></h2>
+
+        <div class="hint-area" id="hint-area" hidden>
+          <button type="button" class="btn tiny ghost" id="btn-hint" data-i18n="study.hintShow"></button>
+          <p class="hint" id="hint-text" hidden></p>
+        </div>
+
+        <form id="study-form" autocomplete="off" novalidate>
+          <div class="password-field">
+            <input type="password" id="study-input" name="answer"
+                   autocomplete="off" autocapitalize="off" autocorrect="off"
+                   spellcheck="false" enterkeyhint="go" data-i18n-placeholder="study.placeholder">
+            <button type="button" class="icon-btn inline" id="btn-reveal" data-icon="eye"
+                    data-i18n-title="study.reveal" data-i18n-aria="study.reveal"></button>
+          </div>
+          <button type="submit" class="btn primary block" id="btn-check" data-i18n="study.check"></button>
+        </form>
+
+        <div class="feedback" id="feedback" hidden>
+          <span class="feedback-mark" data-icon="check" aria-hidden="true"></span>
+          <div>
+            <p class="feedback-title" id="feedback-title"></p>
+            <p class="feedback-help" id="feedback-help"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="study-actions">
+        <button type="button" class="btn ghost" id="btn-skip" data-i18n="study.skip"></button>
+        <button type="button" class="btn primary" id="btn-next" hidden></button>
+      </div>
+    </section>
+
+    <!-- ---------------------------------------------------------- done -->
+    <section class="view center-view" id="view-done" hidden>
+      <span class="done-mark" data-icon="trophy" aria-hidden="true"></span>
+      <h2 data-i18n="study.done.title"></h2>
+      <p class="done-score" id="done-score"></p>
+      <div class="done-actions">
+        <button type="button" class="btn primary" id="btn-again" data-i18n="study.done.again"></button>
+        <button type="button" class="btn ghost" id="btn-done-home" data-i18n="study.done.home"></button>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------ settings -->
+    <section class="view" id="view-settings" hidden>
+      <div class="view-head">
+        <button type="button" class="icon-btn" id="btn-back" data-icon="back" data-i18n-title="nav.back" data-i18n-aria="nav.back"></button>
+        <h2 data-i18n="settings.title"></h2>
+      </div>
+
+      <section class="panel">
+        <h3 data-i18n="settings.appearance"></h3>
+        <div class="row">
+          <label for="sel-theme" data-i18n="settings.theme"></label>
+          <div class="segmented" id="seg-theme" role="group">
+            <button type="button" data-theme="system" data-i18n="settings.themeSystem"></button>
+            <button type="button" data-theme="light" data-i18n="settings.themeLight"></button>
+            <button type="button" data-theme="dark" data-i18n="settings.themeDark"></button>
+          </div>
+        </div>
+        <div class="row">
+          <label for="sel-lang" data-i18n="settings.language"></label>
+          <select id="sel-lang"></select>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head tight">
+          <h3 data-i18n="settings.cards"></h3>
+          <button type="button" class="btn small" id="btn-add-2">
+            <span data-icon="plus" aria-hidden="true"></span><span data-i18n="home.add"></span>
+          </button>
+        </div>
+        <p class="muted" data-i18n="settings.cardsHelp"></p>
+        <ul class="manage-list" id="manage-list"></ul>
+      </section>
+
+      <section class="panel">
+        <h3 data-i18n="settings.data"></h3>
+        <div class="action-row">
+          <button type="button" class="btn" id="btn-export">
+            <span data-icon="download" aria-hidden="true"></span><span data-i18n="settings.export"></span>
+          </button>
+          <p class="muted" data-i18n="settings.exportHelp"></p>
+        </div>
+        <div class="action-row">
+          <button type="button" class="btn" id="btn-import">
+            <span data-icon="upload" aria-hidden="true"></span><span data-i18n="settings.import"></span>
+          </button>
+          <p class="muted" data-i18n="settings.importHelp"></p>
+        </div>
+        <div class="action-row">
+          <button type="button" class="btn danger" id="btn-erase">
+            <span data-icon="trash" aria-hidden="true"></span><span data-i18n="settings.erase"></span>
+          </button>
+          <p class="muted" data-i18n="settings.eraseHelp"></p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h3 data-i18n="settings.how"></h3>
+        <p class="muted" id="how-body"></p>
+      </section>
+
+      <section class="panel">
+        <h3 data-i18n="settings.about"></h3>
+        <p class="muted" id="about-body"></p>
+        <p><a href="https://github.com/mmattia09/hashcards" rel="noopener noreferrer" target="_blank" data-i18n="settings.source"></a></p>
+      </section>
+    </section>
+
+  </main>
+</div>
+
+<!-- ------------------------------------------------------------ dialogs -->
+<dialog id="dlg-card">
+  <form method="dialog" id="form-card" autocomplete="off">
+    <h2 id="dlg-card-title"></h2>
+
+    <label class="field">
+      <span class="field-label" data-i18n="dialog.name"></span>
+      <input type="text" id="fld-name" maxlength="120" autocomplete="off"
+             autocapitalize="sentences" spellcheck="false" data-i18n-placeholder="dialog.namePlaceholder">
+    </label>
+
+    <label class="field">
+      <span class="field-label">
+        <span data-i18n="dialog.hint"></span>
+        <em class="optional" data-i18n="dialog.hintOptional"></em>
+      </span>
+      <input type="text" id="fld-hint" maxlength="200" autocomplete="off"
+             spellcheck="false" data-i18n-placeholder="dialog.hintPlaceholder">
+      <small class="field-help" data-i18n="dialog.hintHelp"></small>
+    </label>
+
+    <div class="password-choice" id="password-choice" hidden>
+      <label class="radio">
+        <input type="radio" name="pwmode" value="keep" checked>
+        <span data-i18n="dialog.keepPassword"></span>
+      </label>
+      <label class="radio">
+        <input type="radio" name="pwmode" value="change">
+        <span>
+          <span data-i18n="dialog.changePassword"></span>
+          <small class="muted" data-i18n="dialog.changePasswordHelp"></small>
+        </span>
+      </label>
+    </div>
+
+    <div id="password-fields">
+      <label class="field">
+        <span class="field-label" data-i18n="dialog.password"></span>
+        <div class="password-field">
+          <input type="password" id="fld-pw" autocomplete="new-password"
+                 autocapitalize="off" autocorrect="off" spellcheck="false">
+          <button type="button" class="icon-btn inline" id="btn-reveal-new" data-icon="eye"
+                  data-i18n-title="study.reveal" data-i18n-aria="study.reveal"></button>
+        </div>
+      </label>
+      <label class="field">
+        <span class="field-label" data-i18n="dialog.passwordRepeat"></span>
+        <input type="password" id="fld-pw2" autocomplete="new-password"
+               autocapitalize="off" autocorrect="off" spellcheck="false">
+        <small class="field-help" data-i18n="dialog.passwordHelp"></small>
+      </label>
+    </div>
+
+    <p class="form-error" id="card-error" hidden></p>
+
+    <menu class="dialog-actions">
+      <button type="button" class="btn ghost" data-close data-i18n="dialog.cancel"></button>
+      <button type="submit" class="btn primary" id="btn-card-save" data-i18n="dialog.save"></button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog id="dlg-delete">
+  <form method="dialog">
+    <h2 data-i18n="dialog.delete.title"></h2>
+    <p id="delete-body"></p>
+    <menu class="dialog-actions">
+      <button type="button" class="btn ghost" data-close data-i18n="dialog.cancel"></button>
+      <button type="submit" class="btn danger" id="btn-delete-confirm" data-i18n="dialog.delete.confirm"></button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog id="dlg-erase">
+  <form method="dialog">
+    <h2 data-i18n="dialog.erase.title"></h2>
+    <p data-i18n="dialog.erase.body"></p>
+    <label class="checkbox">
+      <input type="checkbox" id="erase-ack">
+      <span data-i18n="dialog.erase.ack"></span>
+    </label>
+    <menu class="dialog-actions">
+      <button type="button" class="btn ghost" data-close data-i18n="dialog.cancel"></button>
+      <button type="submit" class="btn danger" id="btn-erase-confirm" data-i18n="dialog.erase.confirm" disabled></button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog id="dlg-import">
+  <form method="dialog">
+    <h2 data-i18n="dialog.import.title"></h2>
+    <input type="file" id="import-file" accept="application/json,.json" class="file-input">
+    <label class="field">
+      <span class="field-label" data-i18n="dialog.import.or"></span>
+      <textarea id="import-text" rows="5" spellcheck="false" data-i18n-placeholder="dialog.import.pastePlaceholder"></textarea>
+    </label>
+    <fieldset class="field">
+      <legend class="field-label" data-i18n="dialog.import.mode"></legend>
+      <label class="radio">
+        <input type="radio" name="importmode" value="merge" checked>
+        <span data-i18n="dialog.import.merge"></span>
+      </label>
+      <label class="radio">
+        <input type="radio" name="importmode" value="replace">
+        <span data-i18n="dialog.import.replace"></span>
+      </label>
+    </fieldset>
+    <p class="form-error" id="import-error" hidden></p>
+    <menu class="dialog-actions">
+      <button type="button" class="btn ghost" data-close data-i18n="dialog.cancel"></button>
+      <button type="submit" class="btn primary" id="btn-import-confirm" data-i18n="dialog.import.confirm"></button>
+    </menu>
+  </form>
+</dialog>
+
+<div class="toast-area" id="toast-area" aria-live="polite"></div>
+
+<script src="js/crypto.js?v=1"></script>
+<script src="js/store.js?v=1"></script>
+<script src="js/i18n.js?v=1"></script>
+<script src="js/icons.js?v=1"></script>
+<script src="js/app.js?v=1"></script>
+</body>
+</html>
