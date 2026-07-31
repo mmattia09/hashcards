@@ -141,7 +141,7 @@
   }
 
   function metaNode(parts) {
-    var meta = doc.createElement('div');
+    var meta = doc.createElement('span');
     meta.className = 'card-meta';
     parts.forEach(function (part, index) {
       if (index) {
@@ -164,6 +164,57 @@
     button.setAttribute('aria-label', label);
     button.addEventListener('click', handler);
     return button;
+  }
+
+  /* One row shape for both lists. The left-hand side is a single wide button —
+   * on the deck it starts a one-card review, in settings it opens the editor —
+   * so a card is always one tap away from something useful. */
+  function cardRow(card, options) {
+    var row = doc.createElement('li');
+    row.className = 'card-row';
+    if (options.pip && card.dueAt <= Date.now()) row.classList.add('is-due');
+
+    var open = doc.createElement('button');
+    open.type = 'button';
+    open.className = 'card-open';
+    open.title = options.openLabel;
+    open.setAttribute('aria-label', options.openLabel + ' — ' + card.name);
+    open.addEventListener('click', options.onOpen);
+
+    if (options.pip) {
+      var pip = doc.createElement('span');
+      pip.className = 'box-pip';
+      pip.textContent = card.box;
+      pip.title = t('card.box', { n: card.box });
+      open.appendChild(pip);
+    }
+
+    var main = doc.createElement('span');
+    main.className = 'card-main';
+    var name = doc.createElement('span');
+    name.className = 'card-name';
+    name.textContent = card.name;
+    main.appendChild(name);
+
+    var parts = options.meta(card);
+    if (parts.length) main.appendChild(metaNode(parts));
+    open.appendChild(main);
+    row.appendChild(open);
+
+    var actions = doc.createElement('div');
+    actions.className = 'card-actions';
+    actions.appendChild(
+      iconButton('pencil', t('card.edit'), function () {
+        openCardDialog(card.id);
+      })
+    );
+    actions.appendChild(
+      iconButton('trash', t('card.delete'), function () {
+        askDelete(card.id);
+      })
+    );
+    row.appendChild(actions);
+    return row;
   }
 
   function renderHome() {
@@ -196,39 +247,16 @@
         return a.dueAt - b.dueAt || a.createdAt - b.createdAt;
       })
       .forEach(function (card) {
-        var row = doc.createElement('li');
-        row.className = 'card-row' + (card.dueAt <= Date.now() ? ' is-due' : '');
-
-        var pip = doc.createElement('span');
-        pip.className = 'box-pip';
-        pip.textContent = card.box;
-        pip.title = t('card.box', { n: card.box });
-        row.appendChild(pip);
-
-        var main = doc.createElement('div');
-        main.className = 'card-main';
-        var name = doc.createElement('div');
-        name.className = 'card-name';
-        name.textContent = card.name;
-        main.appendChild(name);
-        main.appendChild(metaNode(cardMeta(card)));
-        row.appendChild(main);
-
-        var actions = doc.createElement('div');
-        actions.className = 'card-actions';
-        actions.appendChild(
-          iconButton('pencil', t('card.edit'), function () {
-            openCardDialog(card.id);
+        list.appendChild(
+          cardRow(card, {
+            pip: true,
+            openLabel: t('card.review'),
+            meta: cardMeta,
+            onOpen: function () {
+              startSession([card]);
+            }
           })
         );
-        actions.appendChild(
-          iconButton('trash', t('card.delete'), function () {
-            askDelete(card.id);
-          })
-        );
-        row.appendChild(actions);
-
-        list.appendChild(row);
       });
   }
 
@@ -236,32 +264,17 @@
     var list = $('manage-list');
     list.textContent = '';
     HC.store.cards().forEach(function (card) {
-      var row = doc.createElement('li');
-      row.className = 'manage-row';
-
-      var main = doc.createElement('div');
-      main.className = 'card-main';
-      var name = doc.createElement('div');
-      name.className = 'card-name';
-      name.textContent = card.name;
-      main.appendChild(name);
-      if (card.hint) main.appendChild(metaNode([t('study.hint') + ': ' + card.hint]));
-      row.appendChild(main);
-
-      var actions = doc.createElement('div');
-      actions.className = 'card-actions';
-      actions.appendChild(
-        iconButton('pencil', t('card.edit'), function () {
+      var row = cardRow(card, {
+        pip: false,
+        openLabel: t('card.edit'),
+        meta: function (c) {
+          return c.hint ? [t('study.hint') + ': ' + c.hint] : [];
+        },
+        onOpen: function () {
           openCardDialog(card.id);
-        })
-      );
-      actions.appendChild(
-        iconButton('trash', t('card.delete'), function () {
-          askDelete(card.id);
-        })
-      );
-      row.appendChild(actions);
-
+        }
+      });
+      row.className = 'manage-row';
       list.appendChild(row);
     });
   }
