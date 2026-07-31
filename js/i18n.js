@@ -74,8 +74,6 @@
     'settings.themeLight': 'Light',
     'settings.themeDark': 'Dark',
     'settings.language': 'Language',
-    'settings.cards': 'Cards',
-    'settings.cardsHelp': 'Add, rename or remove the accounts you are practising.',
     'settings.data': 'Data',
     'settings.export': 'Export deck',
     'settings.exportHelp':
@@ -212,8 +210,6 @@
     'settings.themeLight': 'Chiaro',
     'settings.themeDark': 'Scuro',
     'settings.language': 'Lingua',
-    'settings.cards': 'Carte',
-    'settings.cardsHelp': 'Aggiungi, rinomina o elimina gli account su cui ti stai allenando.',
     'settings.data': 'Dati',
     'settings.export': 'Esporta il mazzo',
     'settings.exportHelp':
@@ -350,8 +346,6 @@
     'settings.themeLight': 'Claro',
     'settings.themeDark': 'Oscuro',
     'settings.language': 'Idioma',
-    'settings.cards': 'Tarjetas',
-    'settings.cardsHelp': 'Añade, renombra o elimina las cuentas con las que practicas.',
     'settings.data': 'Datos',
     'settings.export': 'Exportar el mazo',
     'settings.exportHelp':
@@ -488,8 +482,6 @@
     'settings.themeLight': 'Hell',
     'settings.themeDark': 'Dunkel',
     'settings.language': 'Sprache',
-    'settings.cards': 'Karten',
-    'settings.cardsHelp': 'Konten hinzufügen, umbenennen oder entfernen.',
     'settings.data': 'Daten',
     'settings.export': 'Stapel exportieren',
     'settings.exportHelp':
@@ -626,8 +618,6 @@
     'settings.themeLight': 'Clair',
     'settings.themeDark': 'Sombre',
     'settings.language': 'Langue',
-    'settings.cards': 'Cartes',
-    'settings.cardsHelp': 'Ajoute, renomme ou supprime les comptes que tu révises.',
     'settings.data': 'Données',
     'settings.export': 'Exporter le paquet',
     'settings.exportHelp':

@@ -101,7 +101,6 @@
   function retranslate() {
     applyStrings();
     renderHome();
-    renderManageList();
     if (view === 'study') renderCard();
     if (view === 'done') renderDone();
   }
@@ -166,28 +165,27 @@
     return button;
   }
 
-  /* One row shape for both lists. The left-hand side is a single wide button —
-   * on the deck it starts a one-card review, in settings it opens the editor —
-   * so a card is always one tap away from something useful. */
-  function cardRow(card, options) {
+  /* A deck row: the left-hand side is one wide button that reviews this card on
+   * its own, with edit and delete alongside. */
+  function cardRow(card) {
     var row = doc.createElement('li');
     row.className = 'card-row';
-    if (options.pip && card.dueAt <= Date.now()) row.classList.add('is-due');
+    if (card.dueAt <= Date.now()) row.classList.add('is-due');
 
     var open = doc.createElement('button');
     open.type = 'button';
     open.className = 'card-open';
-    open.title = options.openLabel;
-    open.setAttribute('aria-label', options.openLabel + ' — ' + card.name);
-    open.addEventListener('click', options.onOpen);
+    open.title = t('card.review');
+    open.setAttribute('aria-label', t('card.review') + ' — ' + card.name);
+    open.addEventListener('click', function () {
+      startSession([card]);
+    });
 
-    if (options.pip) {
-      var pip = doc.createElement('span');
-      pip.className = 'box-pip';
-      pip.textContent = card.box;
-      pip.title = t('card.box', { n: card.box });
-      open.appendChild(pip);
-    }
+    var pip = doc.createElement('span');
+    pip.className = 'box-pip';
+    pip.textContent = card.box;
+    pip.title = t('card.box', { n: card.box });
+    open.appendChild(pip);
 
     var main = doc.createElement('span');
     main.className = 'card-main';
@@ -195,9 +193,7 @@
     name.className = 'card-name';
     name.textContent = card.name;
     main.appendChild(name);
-
-    var parts = options.meta(card);
-    if (parts.length) main.appendChild(metaNode(parts));
+    main.appendChild(metaNode(cardMeta(card)));
     open.appendChild(main);
     row.appendChild(open);
 
@@ -247,36 +243,8 @@
         return a.dueAt - b.dueAt || a.createdAt - b.createdAt;
       })
       .forEach(function (card) {
-        list.appendChild(
-          cardRow(card, {
-            pip: true,
-            openLabel: t('card.review'),
-            meta: cardMeta,
-            onOpen: function () {
-              startSession([card]);
-            }
-          })
-        );
+        list.appendChild(cardRow(card));
       });
-  }
-
-  function renderManageList() {
-    var list = $('manage-list');
-    list.textContent = '';
-    HC.store.cards().forEach(function (card) {
-      var row = cardRow(card, {
-        pip: false,
-        openLabel: t('card.edit'),
-        meta: function (c) {
-          return c.hint ? [t('study.hint') + ': ' + c.hint] : [];
-        },
-        onOpen: function () {
-          openCardDialog(card.id);
-        }
-      });
-      row.className = 'manage-row';
-      list.appendChild(row);
-    });
   }
 
   /* -------------------------------------------------------------- study */
@@ -416,7 +384,6 @@
     renderDone();
     go('done');
     renderHome();
-    renderManageList();
   }
 
   function renderDone() {
@@ -539,7 +506,6 @@
     editingId = null;
     $('dlg-card').close();
     renderHome();
-    renderManageList();
   }
 
   /* ------------------------------------------------------ delete dialog */
@@ -613,7 +579,6 @@
 
       $('dlg-import').close();
       renderHome();
-      renderManageList();
       toast(t('toast.imported', { added: result.imported, updated: result.updated }));
     });
   }
@@ -664,7 +629,6 @@
       go('home');
     });
     on($('btn-settings'), 'click', function () {
-      renderManageList();
       syncSettingsControls();
       go('settings');
     });
@@ -703,9 +667,6 @@
     });
 
     on($('btn-add'), 'click', function () {
-      openCardDialog(null);
-    });
-    on($('btn-add-2'), 'click', function () {
       openCardDialog(null);
     });
     on($('btn-empty-add'), 'click', function () {
@@ -764,7 +725,6 @@
         HC.store.deleteCard(pendingDeleteId);
         pendingDeleteId = null;
         renderHome();
-        renderManageList();
         toast(t('toast.cardDeleted'));
       }
     });
@@ -811,7 +771,6 @@
     syncSettingsControls();
     applyStrings();
     renderHome();
-    renderManageList();
     show($('app'), true);
 
     if ('serviceWorker' in global.navigator && global.location.protocol.indexOf('http') === 0) {
