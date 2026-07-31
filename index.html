@@ -7,12 +7,12 @@
 <meta name="description" content="Flashcards for your passwords. Only salted PBKDF2 hashes are stored, never the passwords themselves.">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0d0f14" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0e1016" media="(prefers-color-scheme: dark)">
 <meta name="referrer" content="no-referrer">
 <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=1">
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 
@@ -43,8 +43,6 @@
 
     <!-- ---------------------------------------------------------- home -->
     <section class="view" id="view-home">
-      <p class="tagline" data-i18n="app.tagline"></p>
-
       <div class="stats" id="stats">
         <div class="stat">
           <span class="stat-value" id="stat-cards">0</span>
@@ -98,7 +96,7 @@
         <h2 class="account" id="study-name"></h2>
 
         <div class="hint-area" id="hint-area" hidden>
-          <button type="button" class="btn tiny ghost" id="btn-hint" data-i18n="study.hintShow"></button>
+          <button type="button" class="btn small" id="btn-hint" data-i18n="study.hintShow"></button>
           <p class="hint" id="hint-text" hidden></p>
         </div>
 
@@ -149,8 +147,8 @@
       <section class="panel">
         <h3 data-i18n="settings.appearance"></h3>
         <div class="row">
-          <label for="sel-theme" data-i18n="settings.theme"></label>
-          <div class="segmented" id="seg-theme" role="group">
+          <span class="row-label" id="theme-label" data-i18n="settings.theme"></span>
+          <div class="segmented" id="seg-theme" role="group" aria-labelledby="theme-label">
             <button type="button" data-theme="system" data-i18n="settings.themeSystem"></button>
             <button type="button" data-theme="light" data-i18n="settings.themeLight"></button>
             <button type="button" data-theme="dark" data-i18n="settings.themeDark"></button>
@@ -203,7 +201,8 @@
       <section class="panel">
         <h3 data-i18n="settings.about"></h3>
         <p class="muted" id="about-body"></p>
-        <p><a href="https://github.com/mmattia09/hashcards" rel="noopener noreferrer" target="_blank" data-i18n="settings.source"></a></p>
+        <p><a class="link" href="https://github.com/mmattia09/hashcards"
+              rel="noopener noreferrer" target="_blank" data-i18n="settings.source"></a></p>
       </section>
     </section>
 
@@ -327,10 +326,10 @@
 
 <div class="toast-area" id="toast-area" aria-live="polite"></div>
 
-<script src="js/crypto.js?v=1"></script>
-<script src="js/store.js?v=1"></script>
-<script src="js/i18n.js?v=1"></script>
-<script src="js/icons.js?v=1"></script>
-<script src="js/app.js?v=1"></script>
+<script src="js/crypto.js?v=2"></script>
+<script src="js/store.js?v=2"></script>
+<script src="js/i18n.js?v=2"></script>
+<script src="js/icons.js?v=2"></script>
+<script src="js/app.js?v=2"></script>
 </body>
 </html>

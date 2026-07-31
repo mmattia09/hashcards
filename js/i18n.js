@@ -12,8 +12,6 @@
   var DICTS = {};
 
   DICTS.en = {
-    'app.tagline': 'Practise your passwords. Never store them.',
-
     'nav.settings': 'Settings',
     'nav.back': 'Back',
     'nav.theme': 'Switch theme',
@@ -41,6 +39,7 @@
     'card.box': 'Box {n}',
     'card.never': 'Never reviewed',
     'card.score': '{correct} right · {wrong} wrong',
+    'card.review': 'Review this card',
     'card.edit': 'Edit',
     'card.delete': 'Delete',
 
@@ -151,8 +150,6 @@
   };
 
   DICTS.it = {
-    'app.tagline': 'Allena le tue password. Nessuna viene salvata.',
-
     'nav.settings': 'Impostazioni',
     'nav.back': 'Indietro',
     'nav.theme': 'Cambia tema',
@@ -180,6 +177,7 @@
     'card.box': 'Scatola {n}',
     'card.never': 'Mai ripassata',
     'card.score': '{correct} giuste · {wrong} sbagliate',
+    'card.review': 'Ripassa questa carta',
     'card.edit': 'Modifica',
     'card.delete': 'Elimina',
 
@@ -290,8 +288,6 @@
   };
 
   DICTS.es = {
-    'app.tagline': 'Practica tus contraseñas. Nunca se guardan.',
-
     'nav.settings': 'Ajustes',
     'nav.back': 'Atrás',
     'nav.theme': 'Cambiar tema',
@@ -319,6 +315,7 @@
     'card.box': 'Caja {n}',
     'card.never': 'Nunca repasada',
     'card.score': '{correct} aciertos · {wrong} fallos',
+    'card.review': 'Repasar esta tarjeta',
     'card.edit': 'Editar',
     'card.delete': 'Eliminar',
 
@@ -429,8 +426,6 @@
   };
 
   DICTS.de = {
-    'app.tagline': 'Passwörter üben. Gespeichert wird keines.',
-
     'nav.settings': 'Einstellungen',
     'nav.back': 'Zurück',
     'nav.theme': 'Design wechseln',
@@ -458,6 +453,7 @@
     'card.box': 'Fach {n}',
     'card.never': 'Nie wiederholt',
     'card.score': '{correct} richtig · {wrong} falsch',
+    'card.review': 'Diese Karte wiederholen',
     'card.edit': 'Bearbeiten',
     'card.delete': 'Löschen',
 
@@ -568,8 +564,6 @@
   };
 
   DICTS.fr = {
-    'app.tagline': 'Entraîne-toi sur tes mots de passe. Aucun n’est conservé.',
-
     'nav.settings': 'Réglages',
     'nav.back': 'Retour',
     'nav.theme': 'Changer de thème',
@@ -597,6 +591,7 @@
     'card.box': 'Boîte {n}',
     'card.never': 'Jamais révisée',
     'card.score': '{correct} justes · {wrong} ratées',
+    'card.review': 'Réviser cette carte',
     'card.edit': 'Modifier',
     'card.delete': 'Supprimer',
 
