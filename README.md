@@ -32,6 +32,8 @@ It runs offline after the first visit and installs to a phone's home screen.
 - **Spaced repetition** — five Leitner boxes with intervals of 1, 3, 8, 21 and
   60 days. A card you get right on the first try moves up a box; one you miss
   goes back to the first and comes round again today.
+- **Review one card on its own** — tap it in the list. Useful right after you
+  have changed a password somewhere and want it to stick.
 - **Graded on the first attempt** — you can keep trying a card as long as you
   like, but only the first answer counts. Retrying is for your memory, not for
   your score.
@@ -59,7 +61,8 @@ It runs offline after the first visit and installs to a phone's home screen.
 ## How a review works
 
 1. **Start review** takes the cards that are due, shuffled. **Review every card**
-   ignores the schedule and runs the whole deck.
+   ignores the schedule and runs the whole deck. Tapping a card in the list
+   reviews that one on its own.
 2. The card shows the account name. Type the password and press Enter.
 3. The app hashes what you typed with that card's salt and compares the digests.
    It takes about a fifth of a second — that delay is the point of the KDF.
@@ -199,15 +202,6 @@ it stands.
 ## Support
 
 Questions and bug reports → [GitHub Issues](https://github.com/mmattia09/hashcards/issues).
-
-## Roadmap
-
-- **Optional passphrase-encrypted deck**, so the hashes themselves are not
-  readable by anything that can read localStorage.
-- **Argon2id** behind a feature flag, if it can be done without a heavy
-  dependency.
-- **A typing-accuracy view** — which characters you get wrong, without ever
-  showing the password.
 
 ## Authors and acknowledgment
 
