@@ -11,7 +11,7 @@
   var doc = global.document;
   var t = HC.i18n.t;
 
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';
   var DAY = 86400000;
 
   var $ = function (id) {
@@ -520,30 +520,103 @@
 
   /* ------------------------------------------------------------- export */
 
-  function exportDeck() {
-    var payload = JSON.stringify(HC.store.exportDeck(), null, 2);
-    var blob = new global.Blob([payload], { type: 'application/json' });
+  function download(filename, contents) {
+    var blob = new global.Blob([contents], { type: 'application/json' });
     var url = global.URL.createObjectURL(blob);
     var link = doc.createElement('a');
-    var stamp = new Date().toISOString().slice(0, 10);
     link.href = url;
-    link.download = 'hashcards-' + stamp + '.json';
+    link.download = filename;
     doc.body.appendChild(link);
     link.click();
     link.remove();
     global.setTimeout(function () {
       global.URL.revokeObjectURL(url);
     }, 1000);
-    toast(t('toast.exported'));
+  }
+
+  function today() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function openExportDialog() {
+    doc.querySelector('input[name="exportmode"][value="plain"]').checked = true;
+    show($('export-fields'), false);
+    show($('export-error'), false);
+    clearExportFields();
+    $('btn-export-confirm').disabled = false;
+    text($('btn-export-confirm'), t('dialog.export.confirm'));
+    $('dlg-export').showModal();
+  }
+
+  function clearExportFields() {
+    $('fld-export-pass').value = '';
+    $('fld-export-pass2').value = '';
+    $('fld-export-pass').type = 'password';
+    setRevealIcon($('btn-reveal-export'), false);
+  }
+
+  function exportError(key) {
+    text($('export-error'), t(key));
+    show($('export-error'), true);
+  }
+
+  function resetExportButton() {
+    $('btn-export-confirm').disabled = false;
+    text($('btn-export-confirm'), t('dialog.export.confirm'));
+  }
+
+  function runExport(event) {
+    event.preventDefault();
+    show($('export-error'), false);
+
+    var deck = JSON.stringify(HC.store.exportDeck(), null, 2);
+    var encrypted = doc.querySelector('input[name="exportmode"]:checked').value === 'encrypted';
+
+    if (!encrypted) {
+      download('hashcards-' + today() + '.json', deck);
+      $('dlg-export').close();
+      toast(t('toast.exported'));
+      return;
+    }
+
+    var pass = $('fld-export-pass');
+    if (!pass.value) return exportError('error.passphraseRequired');
+    if (pass.value !== $('fld-export-pass2').value) return exportError('error.passphraseMismatch');
+
+    $('btn-export-confirm').disabled = true;
+    text($('btn-export-confirm'), t('dialog.export.encrypting'));
+
+    HC.crypto
+      .encrypt(deck, pass.value)
+      .then(function (envelope) {
+        clearExportFields();
+        download(
+          'hashcards-' + today() + '.encrypted.json',
+          JSON.stringify(HC.store.encryptedFile(envelope), null, 2)
+        );
+        $('dlg-export').close();
+        toast(t('toast.exportedEncrypted'));
+      })
+      .catch(function () {
+        clearExportFields();
+        resetExportButton();
+        exportError('error.encryptFailed');
+      });
   }
 
   /* ------------------------------------------------------------- import */
 
   function openImportDialog() {
     $('import-file').value = '';
+    text($('import-file-name'), '');
     $('import-text').value = '';
+    $('fld-import-pass').value = '';
+    $('fld-import-pass').type = 'password';
+    setRevealIcon($('btn-reveal-import'), false);
+    show($('import-pass-field'), false);
     doc.querySelector('input[name="importmode"][value="merge"]').checked = true;
     show($('import-error'), false);
+    resetImportButton();
     $('dlg-import').showModal();
   }
 
@@ -552,11 +625,35 @@
     show($('import-error'), true);
   }
 
+  function resetImportButton() {
+    $('btn-import-confirm').disabled = false;
+    text($('btn-import-confirm'), t('dialog.import.confirm'));
+  }
+
   function readImportPayload() {
     var file = $('import-file').files[0];
     if (file) return file.text();
     var pasted = $('import-text').value.trim();
     return pasted ? Promise.resolve(pasted) : Promise.resolve(null);
+  }
+
+  /* Reveal the passphrase field as soon as we can tell the file needs one,
+   * rather than making the user submit to find out. */
+  function peekImportFormat() {
+    readImportPayload()
+      .then(function (raw) {
+        if (!raw) return show($('import-pass-field'), false);
+        var payload;
+        try {
+          payload = JSON.parse(raw);
+        } catch (e) {
+          return;
+        }
+        show($('import-pass-field'), HC.store.isEncrypted(payload));
+      })
+      .catch(function () {
+        /* an unreadable file is reported on submit, not while typing */
+      });
   }
 
   function runImport(event) {
@@ -573,14 +670,48 @@
         return importError('error.importInvalid');
       }
 
-      var mode = doc.querySelector('input[name="importmode"]:checked').value;
-      var result = HC.store.importDeck(payload, mode);
-      if (!result) return importError('error.importInvalid');
+      if (!HC.store.isEncrypted(payload)) return finishImport(payload);
 
-      $('dlg-import').close();
-      renderHome();
-      toast(t('toast.imported', { added: result.imported, updated: result.updated }));
+      show($('import-pass-field'), true);
+      var pass = $('fld-import-pass');
+      if (!pass.value) {
+        importError('error.passphraseNeeded');
+        pass.focus();
+        return;
+      }
+
+      $('btn-import-confirm').disabled = true;
+      text($('btn-import-confirm'), t('dialog.import.decrypting'));
+
+      HC.crypto
+        .decrypt(payload, pass.value)
+        .then(function (plaintext) {
+          pass.value = '';
+          resetImportButton();
+          var inner;
+          try {
+            inner = JSON.parse(plaintext);
+          } catch (e) {
+            return importError('error.importInvalid');
+          }
+          finishImport(inner);
+        })
+        .catch(function () {
+          pass.value = '';
+          resetImportButton();
+          importError('error.wrongPassphrase');
+        });
     });
+  }
+
+  function finishImport(payload) {
+    var mode = doc.querySelector('input[name="importmode"]:checked').value;
+    var result = HC.store.importDeck(payload, mode);
+    if (!result) return importError('error.importInvalid');
+
+    $('dlg-import').close();
+    renderHome();
+    toast(t('toast.imported', { added: result.imported, updated: result.updated }));
   }
 
   /* -------------------------------------------------------------- erase */
@@ -729,9 +860,33 @@
       }
     });
 
-    on($('btn-export'), 'click', exportDeck);
+    on($('btn-export'), 'click', openExportDialog);
+    on($('dlg-export').querySelector('form'), 'submit', runExport);
+    on($('dlg-export'), 'close', clearExportFields);
+    bindReveal('btn-reveal-export', 'fld-export-pass');
+    doc.querySelectorAll('input[name="exportmode"]').forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        var wantsPassphrase = radio.value === 'encrypted' && radio.checked;
+        show($('export-fields'), wantsPassphrase);
+        if (wantsPassphrase) $('fld-export-pass').focus();
+      });
+    });
+
     on($('btn-import'), 'click', openImportDialog);
     on($('dlg-import').querySelector('form'), 'submit', runImport);
+    on($('dlg-import'), 'close', function () {
+      $('fld-import-pass').value = '';
+    });
+    bindReveal('btn-reveal-import', 'fld-import-pass');
+    on($('btn-pick-file'), 'click', function () {
+      $('import-file').click();
+    });
+    on($('import-file'), 'change', function () {
+      var file = $('import-file').files[0];
+      text($('import-file-name'), file ? file.name : '');
+      peekImportFormat();
+    });
+    on($('import-text'), 'input', peekImportFormat);
 
     on($('btn-erase'), 'click', openEraseDialog);
     on($('erase-ack'), 'change', function (e) {

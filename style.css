@@ -587,7 +587,28 @@ dialog > form > p { color: var(--muted); font-size: var(--fs-sm); line-height: 1
 .optional { font-style: normal; font-weight: 400; color: var(--muted); font-size: var(--fs-xs); }
 .field-help { display: block; margin-top: .3rem; font-size: var(--fs-xs); color: var(--muted); line-height: 1.55; }
 
-.file-input { width: 100%; margin-bottom: .9rem; font-size: var(--fs-sm); }
+/* The native file control renders differently in every browser and cannot be
+ * styled to match; a real button driving a hidden input can. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.file-picker { display: flex; align-items: center; gap: .6rem; }
+.file-name {
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .radio, .checkbox {
   display: flex;

@@ -1,8 +1,9 @@
-/* Hashcards — password hashing.
+/* Hashcards — password hashing and export encryption.
  *
  * Everything here runs on the Web Crypto API: no dependencies, no network.
  * A password is turned into a PBKDF2-SHA-256 digest with a per-card random
- * salt and never leaves this function in readable form.
+ * salt and never leaves this function in readable form. The same KDF, with a
+ * fresh salt, derives the AES-GCM key that protects an exported deck.
  */
 (function (global) {
   'use strict';
@@ -15,6 +16,10 @@
   var HASH = 'SHA-256';
   var DIGEST_BITS = 256;
   var SALT_BYTES = 16;
+
+  var CIPHER = 'AES-GCM';
+  var CIPHER_BITS = 256;
+  var IV_BYTES = 12;
 
   var subtle = global.crypto && global.crypto.subtle;
 
@@ -124,11 +129,107 @@
     }
   }
 
+  /* ---- export encryption ----
+   *
+   * The same PBKDF2 work factor as a card, with its own salt, turned into an
+   * AES-GCM key. GCM authenticates as well as encrypts, so a wrong passphrase
+   * and a tampered file both come back as the same plain failure. */
+
+  function deriveKey(passphrase, salt, iterations, hash, usage) {
+    return subtle
+      .importKey('raw', encode(passphrase), 'PBKDF2', false, ['deriveKey'])
+      .then(function (base) {
+        return subtle.deriveKey(
+          { name: 'PBKDF2', salt: salt, iterations: iterations, hash: hash },
+          base,
+          { name: CIPHER, length: CIPHER_BITS },
+          false,
+          [usage]
+        );
+      });
+  }
+
+  /* Returns the parts of an encrypted envelope: the KDF parameters, the IV and
+   * the ciphertext, all base64. The passphrase is not kept. */
+  function encrypt(plaintext, passphrase) {
+    var salt = randomBytes(SALT_BYTES);
+    var iv = randomBytes(IV_BYTES);
+    return deriveKey(passphrase, salt, ITERATIONS, HASH, 'encrypt')
+      .then(function (key) {
+        return subtle.encrypt(
+          { name: CIPHER, iv: iv },
+          key,
+          new TextEncoder().encode(plaintext)
+        );
+      })
+      .then(function (buf) {
+        return {
+          kdf: {
+            name: 'PBKDF2',
+            hash: HASH,
+            iterations: ITERATIONS,
+            salt: toBase64(salt)
+          },
+          cipher: { name: CIPHER, iv: toBase64(iv) },
+          payload: toBase64(new Uint8Array(buf))
+        };
+      });
+  }
+
+  /* Rejects when the passphrase is wrong, when the file has been altered, or
+   * when the envelope is not one we can read. Callers cannot tell the first two
+   * apart, and neither can anyone else. */
+  function decrypt(envelope, passphrase) {
+    if (!validEnvelope(envelope)) return Promise.reject(new Error('bad envelope'));
+    var salt, iv, data;
+    try {
+      salt = fromBase64(envelope.kdf.salt);
+      iv = fromBase64(envelope.cipher.iv);
+      data = fromBase64(envelope.payload);
+    } catch (e) {
+      return Promise.reject(new Error('bad envelope'));
+    }
+    return deriveKey(passphrase, salt, envelope.kdf.iterations, envelope.kdf.hash, 'decrypt')
+      .then(function (key) {
+        return subtle.decrypt({ name: CIPHER, iv: iv }, key, data);
+      })
+      .then(function (buf) {
+        return new TextDecoder().decode(buf);
+      });
+  }
+
+  /* Shape check for an encrypted file, so a malformed one fails as "not a
+   * Hashcards export" rather than somewhere inside Web Crypto. */
+  function validEnvelope(envelope) {
+    if (!envelope || typeof envelope !== 'object') return false;
+    var kdf = envelope.kdf;
+    var cipher = envelope.cipher;
+    if (!kdf || kdf.name !== 'PBKDF2') return false;
+    if (typeof kdf.hash !== 'string' || !/^SHA-(256|384|512)$/.test(kdf.hash)) return false;
+    if (!Number.isInteger(kdf.iterations) || kdf.iterations < 1 || kdf.iterations > 10000000) {
+      return false;
+    }
+    if (!cipher || cipher.name !== CIPHER || typeof cipher.iv !== 'string') return false;
+    if (typeof kdf.salt !== 'string' || typeof envelope.payload !== 'string') return false;
+    try {
+      return (
+        fromBase64(kdf.salt).length > 0 &&
+        fromBase64(cipher.iv).length === IV_BYTES &&
+        fromBase64(envelope.payload).length > 16
+      );
+    } catch (e) {
+      return false;
+    }
+  }
+
   HC.crypto = {
     supported: supported,
     hash: hash,
     verify: verify,
     validRecord: validRecord,
+    encrypt: encrypt,
+    decrypt: decrypt,
+    validEnvelope: validEnvelope,
     ITERATIONS: ITERATIONS
   };
 })(window);

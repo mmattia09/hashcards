@@ -11,6 +11,7 @@
   var DECK_KEY = 'hashcards.deck.v1';
   var PREFS_KEY = 'hashcards.prefs.v1';
   var EXPORT_FORMAT = 'hashcards.deck';
+  var ENCRYPTED_FORMAT = 'hashcards.deck.encrypted';
   var EXPORT_VERSION = 1;
 
   // Leitner boxes: how long a card rests after landing in each one.
@@ -246,6 +247,24 @@
     };
   }
 
+  /* Wraps the parts from HC.crypto.encrypt into the file that gets downloaded.
+   * Only the header is readable: card names, hints and hashes are all inside
+   * the ciphertext. */
+  function encryptedFile(envelope) {
+    return {
+      format: ENCRYPTED_FORMAT,
+      version: EXPORT_VERSION,
+      exportedAt: new Date().toISOString(),
+      kdf: envelope.kdf,
+      cipher: envelope.cipher,
+      payload: envelope.payload
+    };
+  }
+
+  function isEncrypted(payload) {
+    return !!payload && payload.format === ENCRYPTED_FORMAT;
+  }
+
   /* mode: 'merge' updates same-named cards and appends the rest,
    *       'replace' drops the current deck first.
    * Returns null when the payload is not a Hashcards export. */
@@ -307,6 +326,8 @@
     prefs: loadPrefs,
     setPref: setPref,
     exportDeck: exportDeck,
+    encryptedFile: encryptedFile,
+    isEncrypted: isEncrypted,
     importDeck: importDeck,
     eraseAll: eraseAll,
     INTERVALS_DAYS: INTERVALS_DAYS,

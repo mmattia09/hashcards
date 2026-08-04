@@ -6,17 +6,17 @@
  * Bump CACHE whenever a cached file changes, or browsers keep serving the old
  * copy to anyone who has already opened the app.
  */
-var CACHE = 'hashcards-v2';
+var CACHE = 'hashcards-v4';
 
 var SHELL = [
   './',
   'index.html',
-  'style.css?v=2',
-  'js/crypto.js?v=2',
-  'js/store.js?v=2',
-  'js/i18n.js?v=2',
-  'js/icons.js?v=2',
-  'js/app.js?v=2',
+  'style.css?v=4',
+  'js/crypto.js?v=4',
+  'js/store.js?v=4',
+  'js/i18n.js?v=4',
+  'js/icons.js?v=4',
+  'js/app.js?v=4',
   'manifest.webmanifest',
   'icons/favicon.svg',
   'icons/icon.svg',

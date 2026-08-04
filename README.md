@@ -46,6 +46,10 @@ It runs offline after the first visit and installs to a phone's home screen.
 - **Export and import** — one JSON file with the hashes, salts and your
   progress. Import merges by name or replaces the deck outright; malformed or
   unverifiable records are dropped rather than stored.
+- **Encrypted exports** — optionally seal the file with a passphrase:
+  AES-256-GCM, key derived by the same 600 000-iteration PBKDF2. Account names,
+  hints and hashes all disappear into the ciphertext. Importing one asks for the
+  passphrase; a wrong one, or a file altered by a single bit, fails outright.
 - **Erase everything** — one button, one confirmation, and both localStorage
   keys are gone. Afterwards the app leaves nothing at all in this browser.
 - **Five languages** — English, Italian, Spanish, German and French, picked in
@@ -81,9 +85,10 @@ stored, anywhere, in any form: the password.
 **Your deck is still worth protecting.** A digest is not plaintext, but it is
 offline-attackable: anyone who copies it can guess passwords against it as fast
 as their hardware allows. 600 000 iterations makes that expensive, not
-impossible — a weak password will still fall. Treat an export file the way you
-would treat any password-adjacent material, and remember that account *names*
-and *hints* are in there in clear.
+impossible — a weak password will still fall. A plain export carries account
+*names* and *hints* in the clear too, so treat it the way you would treat any
+password-adjacent material — or [encrypt it](#encrypted), which is what the
+passphrase option is for.
 
 **Threat model, plainly.** Hashcards defends against the disclosure of your
 passwords by the app itself: there is no server to breach, no sync, no
@@ -119,7 +124,7 @@ browser.
 index.html              — every screen, one page
 style.css               — tokens, light and dark theme
 js/
-  crypto.js             — PBKDF2 hashing, verification, constant-time compare
+  crypto.js             — PBKDF2 hashing, constant-time compare, AES-GCM exports
   store.js              — localStorage, Leitner scheduling, export/import
   i18n.js               — the five dictionaries
   icons.js              — inline SVG icons
@@ -161,6 +166,36 @@ Importing checks every record before it is stored — the KDF must be one the ap
 can run, and the salt and digest must decode to sensible lengths. Anything that
 fails is dropped, so a hand-edited file cannot leave an uncheckable card in the
 deck.
+
+### Encrypted
+
+Choosing a passphrase at export time produces
+`hashcards-YYYY-MM-DD.encrypted.json` instead. Only the header is readable: the
+cards, their names and their hints are all inside the ciphertext.
+
+```json
+{
+  "format": "hashcards.deck.encrypted",
+  "version": 1,
+  "exportedAt": "2026-08-04T09:15:00.000Z",
+  "kdf": { "name": "PBKDF2", "hash": "SHA-256", "iterations": 600000, "salt": "…" },
+  "cipher": { "name": "AES-GCM", "iv": "…" },
+  "payload": "…"
+}
+```
+
+The passphrase goes through the same PBKDF2 work factor as a card password, with
+its own 16-byte salt, into a 256-bit AES-GCM key; the IV is 12 fresh random
+bytes. GCM authenticates as well as encrypts, so a wrong passphrase and a
+tampered file are indistinguishable from the outside and both simply fail —
+nothing partial is ever written to the deck.
+
+Every parameter needed to read the file is in its own header, and the plaintext
+inside is exactly the plain format documented above, so the file is not locked to
+this app: any PBKDF2 + AES-GCM implementation can open it given the passphrase.
+
+There is no recovery path. A lost passphrase means a lost file, for you as much
+as for anyone else.
 
 ## Data stored on the device
 
@@ -215,4 +250,4 @@ Made by [@mmattia09](https://github.com/mmattia09). Developed with the help of
 ## Project status
 
 **Active** — the app does what its author needs it to do. Fixes and small
-improvements land as needed; the roadmap above is best-effort.
+improvements land as needed.
