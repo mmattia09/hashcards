@@ -11,8 +11,12 @@
   var doc = global.document;
   var t = HC.i18n.t;
 
-  var VERSION = '1.1.0';
+  var VERSION = '1.2.0';
   var DAY = 86400000;
+
+  // Enough for any service's backup sheet, and few enough that hashing them all
+  // at 600k iterations each stays a wait rather than a hang.
+  var MAX_CODES = 24;
 
   var $ = function (id) {
     return doc.getElementById(id);
@@ -129,14 +133,26 @@
     return t('card.dueInDays', { n: days - 1 });
   }
 
-  /* The box lives in the pip, so the line below the name only carries the two
-   * things that change: when it is next up, and how it has gone so far. */
+  /* The box lives in the pip, so the line below the name only carries what
+   * changes: when it is next up, how it has gone, and — for a codes card — how
+   * many codes are on it. */
   function cardMeta(card) {
     var reviewed = card.correct + card.wrong > 0;
-    return [
-      dueLabel(card),
+    var parts = [dueLabel(card)];
+    if (HC.store.isCodes(card)) {
+      var n = card.digests.length;
+      parts.push(n === 1 ? t('card.codesOne') : t('card.codes', { n: n }));
+    }
+    parts.push(
       reviewed ? t('card.score', { correct: card.correct, wrong: card.wrong }) : t('card.never')
-    ];
+    );
+    return parts;
+  }
+
+  /* Each card keeps the colour it was created with. */
+  function paintCardColor(el, card) {
+    for (var i = 0; i < HC.store.PALETTE_SIZE; i++) el.classList.remove('c' + i);
+    el.classList.add('c' + card.colorIdx);
   }
 
   function metaNode(parts) {
@@ -170,6 +186,7 @@
   function cardRow(card) {
     var row = doc.createElement('li');
     row.className = 'card-row';
+    paintCardColor(row, card);
     if (card.dueAt <= Date.now()) row.classList.add('is-due');
 
     var open = doc.createElement('button');
@@ -274,13 +291,21 @@
   function renderCard() {
     var card = currentCard();
     if (!card) return finishSession();
+    var codes = HC.store.isCodes(card);
 
     session.failed = false;
     session.busy = false;
+    // For a codes card, the indices still to be recalled this round.
+    session.remaining = codes
+      ? card.digests.map(function (_, i) {
+          return i;
+        })
+      : null;
 
     text($('study-name'), card.name);
     text($('progress-label'), t('study.progress', { i: session.index + 1, n: session.queue.length }));
     $('progress-fill').style.width = (session.index / session.queue.length) * 100 + '%';
+    paintCardColor($('flashcard'), card);
 
     show($('hint-area'), !!card.hint);
     show($('hint-text'), false);
@@ -300,8 +325,27 @@
     text($('btn-check'), t('study.check'));
     show($('btn-skip'), true);
     show($('btn-next'), false);
+    renderPrompt(card);
 
     if (!('ontouchstart' in global)) input.focus();
+  }
+
+  /* The line above the account name, and the placeholder below it: a password
+   * card asks once, a codes card counts its way through the set. */
+  function renderPrompt(card) {
+    var input = $('study-input');
+    if (!HC.store.isCodes(card)) {
+      text($('study-question'), t('study.question'));
+      input.setAttribute('placeholder', t('study.placeholder'));
+      show($('code-step'), false);
+      return;
+    }
+    show($('code-step'), true);
+    var total = card.digests.length;
+    var done = total - session.remaining.length;
+    text($('study-question'), t('study.questionCodes'));
+    text($('code-step'), t('study.codeOf', { i: Math.min(done + 1, total), n: total }));
+    input.setAttribute('placeholder', t('study.codePlaceholder'));
   }
 
   function feedback(ok, title, help) {
@@ -323,40 +367,32 @@
     var input = $('study-input');
     if (!card || !input.value) return;
 
+    var codes = HC.store.isCodes(card);
     session.busy = true;
     $('btn-check').disabled = true;
     text($('btn-check'), t('study.checking'));
 
-    HC.crypto
-      .verify(input.value, card)
-      .then(function (matches) {
+    var attempt = codes
+      ? HC.crypto.verifyCode(input.value, card, session.remaining).then(function (index) {
+          return index;
+        })
+      : HC.crypto.verify(input.value, card).then(function (ok) {
+          return ok ? 0 : -1;
+        });
+
+    attempt
+      .then(function (index) {
         input.value = '';
         session.busy = false;
 
-        if (matches) {
-          if (!session.failed) session.correct += 1;
-          HC.store.grade(card.id, !session.failed);
-          input.disabled = true;
-          show($('btn-check'), false);
-          show($('btn-skip'), false);
-          show($('btn-next'), true);
-          text(
-            $('btn-next'),
-            session.index + 1 < session.queue.length ? t('study.next') : t('study.done.title')
-          );
-          feedback(true, t('study.correct'));
-          $('btn-next').focus();
-        } else {
-          session.failed = true;
-          $('btn-check').disabled = false;
-          text($('btn-check'), t('study.retry'));
-          feedback(false, t('study.wrong'), t('study.wrongHelp'));
-          $('flashcard').classList.add('shake');
-          global.setTimeout(function () {
-            $('flashcard').classList.remove('shake');
-          }, 420);
-          input.focus();
+        if (index < 0) return answerMissed(card, input, codes);
+
+        // A codes card is only finished once every code has come back.
+        if (codes) {
+          session.remaining.splice(session.remaining.indexOf(index), 1);
+          if (session.remaining.length) return codeAccepted(card, input);
         }
+        cardCompleted(card, input, codes);
       })
       .catch(function () {
         session.busy = false;
@@ -364,6 +400,46 @@
         $('btn-check').disabled = false;
         text($('btn-check'), t('study.check'));
       });
+  }
+
+  /* One of the codes landed, but the card is not done yet. */
+  function codeAccepted(card, input) {
+    $('btn-check').disabled = false;
+    text($('btn-check'), t('study.check'));
+    feedback(true, t('study.codeCorrect'));
+    renderPrompt(card);
+    input.focus();
+  }
+
+  function cardCompleted(card, input, codes) {
+    if (!session.failed) session.correct += 1;
+    HC.store.grade(card.id, !session.failed);
+    input.disabled = true;
+    show($('btn-check'), false);
+    show($('btn-skip'), false);
+    show($('btn-next'), true);
+    text(
+      $('btn-next'),
+      session.index + 1 < session.queue.length ? t('study.next') : t('study.done.title')
+    );
+    feedback(true, t(codes ? 'study.codeCorrect' : 'study.correct'));
+    $('btn-next').focus();
+  }
+
+  function answerMissed(card, input, codes) {
+    session.failed = true;
+    $('btn-check').disabled = false;
+    text($('btn-check'), t('study.retry'));
+    feedback(
+      false,
+      t(codes ? 'study.codeWrong' : 'study.wrong'),
+      t(codes ? 'study.codeWrongHelp' : 'study.wrongHelp')
+    );
+    $('flashcard').classList.add('shake');
+    global.setTimeout(function () {
+      $('flashcard').classList.remove('shake');
+    }, 420);
+    input.focus();
   }
 
   function skipCard() {
@@ -419,23 +495,67 @@
 
   /* ------------------------------------------------------- card dialog */
 
+  function chosenType() {
+    var checked = doc.querySelector('input[name="cardtype"]:checked');
+    return checked && checked.value === 'codes' ? 'codes' : 'password';
+  }
+
+  /* One code per line; blank lines and stray whitespace are the user's, not
+   * something to complain about. */
+  function parseCodes(raw) {
+    return String(raw)
+      .split('\n')
+      .map(function (line) {
+        return line.trim();
+      })
+      .filter(function (line) {
+        return line && HC.crypto.codeForm(line);
+      });
+  }
+
+  function refreshCodesCount() {
+    var n = parseCodes($('fld-codes').value).length;
+    text($('codes-count'), n === 1 ? t('dialog.codesCountedOne') : t('dialog.codesCounted', { n: n }));
+    show($('codes-count'), n > 0);
+  }
+
+  /* The dialog shows one set of fields or the other, and in edit mode offers to
+   * keep what is already there. */
+  function syncCardDialog() {
+    var codes = chosenType() === 'codes';
+    var keeping = editingId && passwordMode() === 'keep';
+
+    text($('keep-label'), t(codes ? 'dialog.keepCodes' : 'dialog.keepPassword'));
+    text($('change-label'), t(codes ? 'dialog.changeCodes' : 'dialog.changePassword'));
+    text($('codes-help'), t('dialog.codesHelp', { max: MAX_CODES }));
+
+    show($('codes-fields'), codes && !keeping);
+    show($('password-fields'), !codes && !keeping);
+    refreshCodesCount();
+  }
+
   function openCardDialog(id) {
     editingId = id || null;
     var card = id ? HC.store.byId(id) : null;
+    var isCodes = card ? HC.store.isCodes(card) : false;
 
     text($('dlg-card-title'), t(card ? 'dialog.editCard' : 'dialog.newCard'));
     $('fld-name').value = card ? card.name : '';
     $('fld-hint').value = card ? card.hint : '';
     $('fld-pw').value = '';
     $('fld-pw2').value = '';
+    $('fld-codes').value = '';
     $('fld-pw').type = 'password';
     setRevealIcon($('btn-reveal-new'), false);
     show($('card-error'), false);
 
+    doc.querySelector('input[name="cardtype"][value="' + (isCodes ? 'codes' : 'password') + '"]')
+      .checked = true;
+    doc.querySelector('input[name="pwmode"][value="keep"]').checked = true;
     show($('password-choice'), !!card);
-    var keep = doc.querySelector('input[name="pwmode"][value="keep"]');
-    keep.checked = true;
-    show($('password-fields'), !card);
+    // Changing what a card holds means replacing its secret either way.
+    show($('type-choice'), !card);
+    syncCardDialog();
 
     $('btn-card-save').disabled = false;
     text($('btn-card-save'), t('dialog.save'));
@@ -448,9 +568,14 @@
     return editingId && checked ? checked.value : 'change';
   }
 
-  function cardError(key) {
-    text($('card-error'), t(key));
+  function cardError(key, vars) {
+    text($('card-error'), t(key, vars));
     show($('card-error'), true);
+  }
+
+  function resetSaveButton() {
+    $('btn-card-save').disabled = false;
+    text($('btn-card-save'), t('dialog.save'));
   }
 
   function saveCard(event) {
@@ -459,8 +584,6 @@
     var name = $('fld-name').value.trim();
     var hint = $('fld-hint').value.trim();
     var mode = passwordMode();
-    var pw = $('fld-pw');
-    var pw2 = $('fld-pw2');
 
     show($('card-error'), false);
 
@@ -474,6 +597,13 @@
       return;
     }
 
+    return chosenType() === 'codes' ? saveCodesCard(name, hint) : savePasswordCard(name, hint);
+  }
+
+  function savePasswordCard(name, hint) {
+    var pw = $('fld-pw');
+    var pw2 = $('fld-pw2');
+
     if (!pw.value) return cardError('error.passwordRequired');
     if (pw.value !== pw2.value) return cardError('error.passwordMismatch');
 
@@ -485,22 +615,51 @@
       .then(function (record) {
         pw.value = '';
         pw2.value = '';
-        if (editingId) HC.store.updateCard(editingId, name, hint, record);
-        else HC.store.addCard(name, hint, record);
-        var wasEdit = !!editingId;
-        closeCardDialog();
-        toast(t(wasEdit ? 'toast.cardUpdated' : 'toast.cardAdded'));
+        commitCard(name, hint, record);
       })
       .catch(function () {
         pw.value = '';
         pw2.value = '';
-        $('btn-card-save').disabled = false;
-        text($('btn-card-save'), t('dialog.save'));
+        resetSaveButton();
         cardError('error.storageFull');
       });
   }
 
+  function saveCodesCard(name, hint) {
+    var field = $('fld-codes');
+    var codes = parseCodes(field.value);
+
+    if (!codes.length) return cardError('error.codesRequired');
+    if (codes.length > MAX_CODES) return cardError('error.tooManyCodes', { max: MAX_CODES });
+
+    $('btn-card-save').disabled = true;
+    text($('btn-card-save'), t('dialog.hashingCodes', { i: 0, n: codes.length }));
+
+    HC.crypto
+      .hashCodes(codes, function (done, total) {
+        text($('btn-card-save'), t('dialog.hashingCodes', { i: done, n: total }));
+      })
+      .then(function (record) {
+        field.value = '';
+        commitCard(name, hint, record);
+      })
+      .catch(function () {
+        field.value = '';
+        resetSaveButton();
+        cardError('error.storageFull');
+      });
+  }
+
+  function commitCard(name, hint, secret) {
+    var wasEdit = !!editingId;
+    if (wasEdit) HC.store.updateCard(editingId, name, hint, secret);
+    else HC.store.addCard(name, hint, secret);
+    closeCardDialog();
+    toast(t(wasEdit ? 'toast.cardUpdated' : 'toast.cardAdded'));
+  }
+
   function closeCardDialog() {
+    $('fld-codes').value = '';
     $('fld-pw').value = '';
     $('fld-pw2').value = '';
     editingId = null;
@@ -844,12 +1003,10 @@
       $('fld-pw').value = '';
       $('fld-pw2').value = '';
     });
-    doc.querySelectorAll('input[name="pwmode"]').forEach(function (radio) {
-      radio.addEventListener('change', function () {
-        show($('password-fields'), radio.value === 'change' && radio.checked);
-        if (radio.value === 'change' && radio.checked) $('fld-pw').focus();
-      });
+    doc.querySelectorAll('input[name="pwmode"], input[name="cardtype"]').forEach(function (radio) {
+      radio.addEventListener('change', syncCardDialog);
     });
+    on($('fld-codes'), 'input', refreshCodesCount);
 
     on($('dlg-delete').querySelector('form'), 'submit', function () {
       if (pendingDeleteId) {

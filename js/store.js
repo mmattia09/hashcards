@@ -12,7 +12,11 @@
   var PREFS_KEY = 'hashcards.prefs.v1';
   var EXPORT_FORMAT = 'hashcards.deck';
   var ENCRYPTED_FORMAT = 'hashcards.deck.encrypted';
-  var EXPORT_VERSION = 1;
+  // 1 = passwords only; 2 adds recovery-code cards and per-card colours.
+  var EXPORT_VERSION = 2;
+
+  // How many colours a card can be given. Must match the .c0..cN CSS classes.
+  var PALETTE_SIZE = 8;
 
   // Leitner boxes: how long a card rests after landing in each one.
   var INTERVALS_DAYS = [0, 1, 3, 8, 21, 60];
@@ -55,7 +59,7 @@
       var stored = read(DECK_KEY, null);
       deck = { cards: [] };
       if (stored && Array.isArray(stored.cards)) {
-        deck.cards = stored.cards.filter(HC.crypto.validRecord).map(normalise);
+        deck.cards = stored.cards.filter(validCard).map(normalise);
       }
     }
     return deck;
@@ -65,15 +69,33 @@
     return write(DECK_KEY, deck);
   }
 
+  /* A card is either a password or a set of recovery codes. Anything without an
+   * explicit type is a password, which is what every deck written before this
+   * existed contains. */
+  function isCodes(card) {
+    return !!card && card.type === 'codes';
+  }
+
+  /* A card carries the colour it was given when it was created, so the deck
+   * looks the same every time it is drawn. */
+  function randomColor() {
+    return global.crypto.getRandomValues(new Uint32Array(1))[0] % PALETTE_SIZE;
+  }
+
   /* Fill in anything a hand-edited or older record might be missing. */
   function normalise(card) {
     var box = Number(card.box);
-    return {
+    var color = Number(card.colorIdx);
+    var codes = isCodes(card);
+    var out = {
       id: typeof card.id === 'string' && card.id ? card.id : newId(),
+      type: codes ? 'codes' : 'password',
       name: String(card.name == null ? '' : card.name).slice(0, 120),
       hint: String(card.hint == null ? '' : card.hint).slice(0, 200),
       kdf: card.kdf,
-      digest: card.digest,
+      colorIdx: Number.isFinite(color)
+        ? ((Math.round(color) % PALETTE_SIZE) + PALETTE_SIZE) % PALETTE_SIZE
+        : randomColor(),
       createdAt: Number(card.createdAt) || Date.now(),
       box: Number.isFinite(box) ? Math.min(Math.max(Math.round(box), 1), MAX_BOX) : 1,
       dueAt: Number(card.dueAt) || 0,
@@ -82,6 +104,14 @@
       wrong: Math.max(0, Number(card.wrong) || 0),
       lastResult: card.lastResult === 'correct' || card.lastResult === 'wrong' ? card.lastResult : null
     };
+    if (codes) out.digests = card.digests.slice();
+    else out.digest = card.digest;
+    return out;
+  }
+
+  /* Both shapes have to be checkable, or the card is not worth storing. */
+  function validCard(card) {
+    return isCodes(card) ? HC.crypto.validCodes(card) : HC.crypto.validRecord(card);
   }
 
   function cards() {
@@ -101,14 +131,17 @@
     });
   }
 
-  /* record is the {kdf, digest} pair from HC.crypto.hash. */
-  function addCard(name, hint, record) {
+  /* secret is either {kdf, digest} from HC.crypto.hash or {kdf, digests} from
+   * HC.crypto.hashCodes. */
+  function addCard(name, hint, secret) {
     var card = normalise({
       id: newId(),
+      type: secret.digests ? 'codes' : 'password',
       name: name,
       hint: hint,
-      kdf: record.kdf,
-      digest: record.digest,
+      kdf: secret.kdf,
+      digest: secret.digest,
+      digests: secret.digests,
       createdAt: Date.now(),
       box: 1,
       dueAt: Date.now()
@@ -118,16 +151,23 @@
     return card;
   }
 
-  /* record is optional: pass it only when the password itself changed, in
-   * which case the card goes back to box 1. */
-  function updateCard(id, name, hint, record) {
+  /* secret is optional: pass it only when the password or the codes themselves
+   * changed, in which case the card goes back to box 1. */
+  function updateCard(id, name, hint, secret) {
     var card = byId(id);
     if (!card) return null;
     card.name = String(name).slice(0, 120);
     card.hint = String(hint == null ? '' : hint).slice(0, 200);
-    if (record) {
-      card.kdf = record.kdf;
-      card.digest = record.digest;
+    if (secret) {
+      card.type = secret.digests ? 'codes' : 'password';
+      card.kdf = secret.kdf;
+      if (secret.digests) {
+        card.digests = secret.digests.slice();
+        delete card.digest;
+      } else {
+        card.digest = secret.digest;
+        delete card.digests;
+      }
       card.box = 1;
       card.dueAt = Date.now();
       card.lastResult = null;
@@ -230,11 +270,12 @@
       version: EXPORT_VERSION,
       exportedAt: new Date().toISOString(),
       cards: loadDeck().cards.map(function (c) {
-        return {
+        var out = {
+          type: c.type,
           name: c.name,
           hint: c.hint,
           kdf: c.kdf,
-          digest: c.digest,
+          colorIdx: c.colorIdx,
           createdAt: c.createdAt,
           box: c.box,
           dueAt: c.dueAt,
@@ -243,6 +284,9 @@
           wrong: c.wrong,
           lastResult: c.lastResult
         };
+        if (isCodes(c)) out.digests = c.digests.slice();
+        else out.digest = c.digest;
+        return out;
       })
     };
   }
@@ -270,7 +314,7 @@
    * Returns null when the payload is not a Hashcards export. */
   function importDeck(payload, mode) {
     if (!payload || payload.format !== EXPORT_FORMAT || !Array.isArray(payload.cards)) return null;
-    var incoming = payload.cards.filter(HC.crypto.validRecord).map(normalise);
+    var incoming = payload.cards.filter(validCard).map(normalise);
     if (mode === 'replace') {
       deck = { cards: incoming };
       saveDeck();
@@ -323,6 +367,8 @@
     dueCards: dueCards,
     stats: stats,
     shuffle: shuffle,
+    isCodes: isCodes,
+    PALETTE_SIZE: PALETTE_SIZE,
     prefs: loadPrefs,
     setPref: setPref,
     exportDeck: exportDeck,

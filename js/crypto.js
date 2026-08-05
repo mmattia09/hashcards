@@ -103,6 +103,93 @@
     });
   }
 
+  /* ---- recovery codes ----
+   *
+   * A set of codes shares one salt, so checking an answer costs a single
+   * derivation instead of one per code. The salt is still random per card, so
+   * nothing precomputed helps; the only thing a shared salt reveals is whether
+   * two codes on the *same* card are identical, which they should never be.
+   *
+   * Codes are matched on their bare alphanumerics, folded to lower case:
+   * "ABCD-EFGH" and "abcdefgh" are the same answer. Services print them in
+   * whichever style they like, and a review should test your memory of the
+   * code, not of its punctuation. */
+  function codeForm(code) {
+    return String(code)
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  /* onProgress(done, total) is called as each code is hashed — with the work
+   * factor deliberately high, a set of ten is not instant. */
+  function hashCodes(codes, onProgress) {
+    var salt = randomBytes(SALT_BYTES);
+    var digests = [];
+    var chain = Promise.resolve();
+
+    codes.forEach(function (code, index) {
+      chain = chain
+        .then(function () {
+          return derive(codeForm(code), salt, ITERATIONS, HASH, DIGEST_BITS);
+        })
+        .then(function (digest) {
+          digests.push(toBase64(digest));
+          if (onProgress) onProgress(index + 1, codes.length);
+        });
+    });
+
+    return chain.then(function () {
+      return {
+        kdf: {
+          name: 'PBKDF2',
+          hash: HASH,
+          iterations: ITERATIONS,
+          salt: toBase64(salt)
+        },
+        digests: digests
+      };
+    });
+  }
+
+  /* Resolves to the index of the code that matched, or -1. `only` limits the
+   * search to the codes still outstanding in this review. */
+  function verifyCode(code, card, only) {
+    if (!validCodes(card)) return Promise.resolve(-1);
+    var salt, expected;
+    try {
+      salt = fromBase64(card.kdf.salt);
+      expected = card.digests.map(fromBase64);
+    } catch (e) {
+      return Promise.resolve(-1);
+    }
+    return derive(codeForm(code), salt, card.kdf.iterations, card.kdf.hash, DIGEST_BITS).then(
+      function (actual) {
+        var found = -1;
+        for (var i = 0; i < expected.length; i++) {
+          if (only && only.indexOf(i) === -1) continue;
+          // No early exit: every candidate is compared, so a near miss costs
+          // exactly what a match costs.
+          if (equal(actual, expected[i]) && found === -1) found = i;
+        }
+        return found;
+      }
+    );
+  }
+
+  function validCodes(card) {
+    if (!card || typeof card !== 'object' || !Array.isArray(card.digests)) return false;
+    if (!card.digests.length) return false;
+    if (!validKdf(card.kdf)) return false;
+    try {
+      return card.digests.every(function (d) {
+        return typeof d === 'string' && fromBase64(d).length >= 16;
+      });
+    } catch (e) {
+      return false;
+    }
+  }
+
   /* Comparison that takes the same time whichever byte differs. */
   function equal(a, b) {
     if (a.length !== b.length) return false;
@@ -111,19 +198,28 @@
     return diff === 0;
   }
 
-  /* Shape check for imported records: enough to refuse a file that would
+  /* Shape checks for imported records: enough to refuse a file that would
    * otherwise sit in storage as an uncheckable card. */
-  function validRecord(record) {
-    if (!record || typeof record !== 'object') return false;
-    var kdf = record.kdf;
+  function validKdf(kdf) {
     if (!kdf || kdf.name !== 'PBKDF2') return false;
     if (typeof kdf.hash !== 'string' || !/^SHA-(1|256|384|512)$/.test(kdf.hash)) return false;
     if (!Number.isInteger(kdf.iterations) || kdf.iterations < 1 || kdf.iterations > 10000000) {
       return false;
     }
-    if (typeof kdf.salt !== 'string' || typeof record.digest !== 'string') return false;
+    if (typeof kdf.salt !== 'string') return false;
     try {
-      return fromBase64(kdf.salt).length > 0 && fromBase64(record.digest).length >= 16;
+      return fromBase64(kdf.salt).length > 0;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function validRecord(record) {
+    if (!record || typeof record !== 'object') return false;
+    if (!validKdf(record.kdf)) return false;
+    if (typeof record.digest !== 'string') return false;
+    try {
+      return fromBase64(record.digest).length >= 16;
     } catch (e) {
       return false;
     }
@@ -226,7 +322,11 @@
     supported: supported,
     hash: hash,
     verify: verify,
+    hashCodes: hashCodes,
+    verifyCode: verifyCode,
+    codeForm: codeForm,
     validRecord: validRecord,
+    validCodes: validCodes,
     encrypt: encrypt,
     decrypt: decrypt,
     validEnvelope: validEnvelope,

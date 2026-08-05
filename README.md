@@ -37,6 +37,13 @@ It runs offline after the first visit and installs to a phone's home screen.
 - **Graded on the first attempt** — you can keep trying a card as long as you
   like, but only the first answer counts. Retrying is for your memory, not for
   your score.
+- **Recovery codes too** — a card can hold a whole set of backup codes instead
+  of a password, as many as the service gave you. A review asks for them one at
+  a time and accepts them **in any order**: each answer is checked against every
+  code you have not yet given. Punctuation and capitals are ignored, so
+  `ABCD-EFGH` and `abcdefgh` are the same answer.
+- **A colour per card** — every card is dealt one of eight, kept for life, so a
+  deck is something you can scan rather than read.
 - **Optional hints** — a line of your own, shown only when you ask for it during
   a review. Stored in clear, and the dialog says so.
 - **Nothing revealed on a miss** — a wrong answer says exactly that, and offers
@@ -72,7 +79,10 @@ It runs offline after the first visit and installs to a phone's home screen.
    It takes about a fifth of a second — that delay is the point of the KDF.
 4. **A match** promotes the card and moves on. **No match** says so and lets you
    try again; the card is already marked missed, and will be back today.
-5. At the end you get the score: how many you recalled first time.
+5. A recovery-codes card is not done until every code has come back. Any order
+   will do, but one miss anywhere sends the whole set back to the first box —
+   knowing seven codes out of eight is not knowing the set.
+6. At the end you get the score: how many you recalled first time.
 
 Quitting a session mid-card records nothing for that card.
 
@@ -97,6 +107,15 @@ defend against a compromised browser or machine — anything that can read your
 keystrokes reads the password as you type it, whatever the app does with it
 afterwards. It is a study tool, not a password manager, and it will never be
 able to tell you a password you have forgotten.
+
+**Recovery codes.** The codes on one card share a single salt, so checking an
+answer costs one derivation rather than one per code — with the work factor
+this high, the difference is the difference between usable and not. The salt is
+still random per card, so nothing precomputed helps; the only thing a shared
+salt gives away is whether two codes *on the same card* are identical, which
+they never should be. Codes are matched on their bare alphanumerics, folded to
+lower case: that is a deliberate trade of a little of the guessing space for a
+review that tests your memory rather than your typing.
 
 **Why PBKDF2.** It is the only password-hashing KDF the Web Crypto API offers.
 Argon2 or scrypt would be stronger per unit of work, but both would mean
@@ -140,27 +159,46 @@ modules, so the app also works when opened straight from the file system.
 
 ## Export format
 
-`hashcards-YYYY-MM-DD.json`:
+`hashcards-YYYY-MM-DD.json`. A password card carries one `digest`; a
+recovery-codes card carries a `digests` array instead, all sharing the card's
+one salt.
 
 ```json
 {
   "format": "hashcards.deck",
-  "version": 1,
-  "exportedAt": "2026-07-30T18:20:00.000Z",
+  "version": 2,
+  "exportedAt": "2026-08-04T18:20:00.000Z",
   "cards": [
     {
+      "type": "password",
       "name": "Email — personal",
       "hint": "the one from 2019",
       "kdf": { "name": "PBKDF2", "hash": "SHA-256", "iterations": 600000, "salt": "…" },
       "digest": "…",
+      "colorIdx": 3,
       "box": 3,
       "dueAt": 1785000000000,
       "correct": 7,
       "wrong": 1
+    },
+    {
+      "type": "codes",
+      "name": "GitHub — recovery codes",
+      "hint": "",
+      "kdf": { "name": "PBKDF2", "hash": "SHA-256", "iterations": 600000, "salt": "…" },
+      "digests": ["…", "…", "…"],
+      "colorIdx": 6,
+      "box": 1,
+      "dueAt": 1785000000000,
+      "correct": 0,
+      "wrong": 0
     }
   ]
 }
 ```
+
+Version 1 files — no `type`, no `colorIdx` — still import: every card in them is
+a password, and each is dealt a colour on the way in.
 
 Importing checks every record before it is stored — the KDF must be one the app
 can run, and the salt and digest must decode to sensible lengths. Anything that

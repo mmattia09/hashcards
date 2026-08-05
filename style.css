@@ -66,6 +66,31 @@
   --shadow-lg: 0 2px 6px rgba(0, 0, 0, .45), 0 24px 60px -22px rgba(0, 0, 0, .8);
 }
 
+/* Card palette. Each card keeps the colour it was born with; --c is the ink,
+ * --c-soft the wash behind it, and the pair simply swaps over when a card is
+ * due. Eight hues, far enough apart to tell a deck apart at a glance. */
+:root {
+  --card-0: #5b5bd6; --card-0-soft: #ecebfd;
+  --card-1: #7c3aed; --card-1-soft: #f0e9fe;
+  --card-2: #2563eb; --card-2-soft: #e5edfd;
+  --card-3: #0e7490; --card-3-soft: #dcf0f6;
+  --card-4: #15803d; --card-4-soft: #e3f5e9;
+  --card-5: #b45309; --card-5-soft: #fbeedb;
+  --card-6: #be123c; --card-6-soft: #fde8ed;
+  --card-7: #a21caf; --card-7-soft: #fbe9fb;
+}
+
+:root[data-theme="dark"] {
+  --card-0: #a5a4f5; --card-0-soft: #262a45;
+  --card-1: #c4a6fd; --card-1-soft: #2b2246;
+  --card-2: #93b4fb; --card-2-soft: #1e2a44;
+  --card-3: #7dd3ec; --card-3-soft: #12303a;
+  --card-4: #86e0a4; --card-4-soft: #16301f;
+  --card-5: #f0c07a; --card-5-soft: #34260f;
+  --card-6: #f5a3b4; --card-6-soft: #3a1a22;
+  --card-7: #eda6ee; --card-7-soft: #351a35;
+}
+
 * { box-sizing: border-box; }
 
 /* Author rules that set `display` would otherwise beat the UA stylesheet and
@@ -261,20 +286,32 @@ main {
 }
 .section-head h2 { font-size: var(--fs-lg); }
 
-.card-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
+/* minmax(0, 1fr) rather than the default auto column: without it the column is
+ * sized to the widest row's min-content, so one long line of metadata pushes
+ * every row past the edge of the screen. */
+.card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .45rem;
+}
 
 .card-row {
+  --c: var(--accent);
+  --c-soft: var(--accent-soft);
   display: flex;
   align-items: center;
   gap: .15rem;
-  padding-right: .35rem;
+  padding: 0 .35rem 0 .4rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   transition: border-color .15s var(--ease);
 }
-.card-row:hover { border-color: var(--border-strong); }
+.card-row:hover { border-color: color-mix(in srgb, var(--c) 35%, var(--border)); }
 
 /* The whole left side is the review button, so a card is one tap away. */
 .card-open {
@@ -283,7 +320,7 @@ main {
   display: flex;
   align-items: center;
   gap: .7rem;
-  padding: .6rem .4rem .6rem .7rem;
+  padding: .6rem .4rem .6rem .55rem;
   font: inherit;
   color: inherit;
   text-align: left;
@@ -302,12 +339,24 @@ main {
   font-size: var(--fs-xs);
   font-weight: 640;
   font-variant-numeric: tabular-nums;
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--c);
+  background: var(--c-soft);
   transition: transform .15s var(--ease);
 }
-.card-row.is-due .box-pip { color: var(--accent-text); background: var(--accent); }
+/* Due cards invert: the wash becomes the ink and the ink the background. */
+.card-row.is-due .box-pip { color: var(--c-soft); background: var(--c); }
 .card-open:hover .box-pip { transform: scale(1.06); }
+
+/* A hairline of the card's colour down the leading edge. */
+.card-row::before {
+  content: '';
+  align-self: stretch;
+  width: 3px;
+  margin: .5rem 0;
+  border-radius: 999px;
+  background: var(--c);
+  opacity: .85;
+}
 
 .card-main { min-width: 0; flex: 1; }
 .card-name {
@@ -366,14 +415,28 @@ main {
 .progress-label { font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
 
 .flashcard {
+  --c: var(--accent);
+  --c-soft: var(--accent-soft);
+  position: relative;
   padding: 1.9rem 1.35rem 1.5rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   text-align: center;
+  overflow: hidden;
   transition: border-color .25s var(--ease);
 }
+/* The card under review wears its own colour along the top. */
+.flashcard::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: var(--c);
+}
+.flashcard.is-correct::before { background: var(--success); }
+.flashcard.is-wrong::before { background: var(--danger); }
 .flashcard.is-correct { border-color: color-mix(in srgb, var(--success) 45%, var(--border)); }
 .flashcard.is-wrong { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
 .flashcard.shake { animation: shake .4s var(--ease); }
@@ -399,8 +462,22 @@ main {
   overflow-wrap: anywhere;
 }
 
+.code-step {
+  display: inline-block;
+  margin: -.9rem 0 1.1rem;
+  padding: .2rem .7rem;
+  font-size: var(--fs-xs);
+  font-weight: 560;
+  letter-spacing: .02em;
+  color: var(--c);
+  background: var(--c-soft);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+.code-step + .hint-area { margin-top: 0; }
+
 .hint-area { margin: -.75rem 0 1.1rem; }
-.hint-area .btn { color: var(--accent); background: var(--accent-soft); border-color: transparent; box-shadow: none; }
+.hint-area .btn { color: var(--c); background: var(--c-soft); border-color: transparent; box-shadow: none; }
 .hint-area .btn:hover { filter: brightness(.97); }
 .hint {
   display: inline-block;
@@ -670,6 +747,18 @@ dialog > form > p { color: var(--muted); font-size: var(--fs-sm); line-height: 1
 @keyframes toast-out {
   to { opacity: 0; transform: translateY(8px); }
 }
+
+/* Anything wearing a card colour picks it up from these two variables. Declared
+ * after .card-row and .flashcard, which both set a fallback: same specificity,
+ * so the one that comes last is the one that wins. */
+.c0 { --c: var(--card-0); --c-soft: var(--card-0-soft); }
+.c1 { --c: var(--card-1); --c-soft: var(--card-1-soft); }
+.c2 { --c: var(--card-2); --c-soft: var(--card-2-soft); }
+.c3 { --c: var(--card-3); --c-soft: var(--card-3-soft); }
+.c4 { --c: var(--card-4); --c-soft: var(--card-4-soft); }
+.c5 { --c: var(--card-5); --c-soft: var(--card-5-soft); }
+.c6 { --c: var(--card-6); --c-soft: var(--card-6-soft); }
+.c7 { --c: var(--card-7); --c-soft: var(--card-7-soft); }
 
 /* -------------------------------------------------------------- mobile */
 

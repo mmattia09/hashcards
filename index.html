@@ -12,7 +12,7 @@
 <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 
@@ -92,8 +92,9 @@
       </div>
 
       <div class="flashcard" id="flashcard">
-        <p class="question" data-i18n="study.question"></p>
+        <p class="question" id="study-question" data-i18n="study.question"></p>
         <h2 class="account" id="study-name"></h2>
+        <p class="code-step" id="code-step" hidden></p>
 
         <div class="hint-area" id="hint-area" hidden>
           <button type="button" class="btn small" id="btn-hint" data-i18n="study.hintShow"></button>
@@ -219,17 +220,42 @@
       <small class="field-help" data-i18n="dialog.hintHelp"></small>
     </label>
 
+    <div class="password-choice" id="type-choice">
+      <span class="field-label" data-i18n="dialog.type"></span>
+      <label class="radio">
+        <input type="radio" name="cardtype" value="password" checked>
+        <span data-i18n="dialog.typePassword"></span>
+      </label>
+      <label class="radio">
+        <input type="radio" name="cardtype" value="codes">
+        <span data-i18n="dialog.typeCodes"></span>
+      </label>
+    </div>
+
     <div class="password-choice" id="password-choice" hidden>
       <label class="radio">
         <input type="radio" name="pwmode" value="keep" checked>
-        <span data-i18n="dialog.keepPassword"></span>
+        <span id="keep-label" data-i18n="dialog.keepPassword"></span>
       </label>
       <label class="radio">
         <input type="radio" name="pwmode" value="change">
         <span>
-          <span data-i18n="dialog.changePassword"></span>
+          <span id="change-label" data-i18n="dialog.changePassword"></span>
           <small class="muted" data-i18n="dialog.changePasswordHelp"></small>
         </span>
+      </label>
+    </div>
+
+    <div id="codes-fields" hidden>
+      <label class="field">
+        <span class="field-label">
+          <span data-i18n="dialog.codes"></span>
+          <em class="optional" id="codes-count"></em>
+        </span>
+        <textarea id="fld-codes" rows="6" spellcheck="false" autocomplete="off"
+                  autocapitalize="off" autocorrect="off"
+                  data-i18n-placeholder="dialog.codesPlaceholder"></textarea>
+        <small class="field-help" id="codes-help"></small>
       </label>
     </div>
 
@@ -381,10 +407,10 @@
 
 <div class="toast-area" id="toast-area" aria-live="polite"></div>
 
-<script src="js/crypto.js?v=4"></script>
-<script src="js/store.js?v=4"></script>
-<script src="js/i18n.js?v=4"></script>
-<script src="js/icons.js?v=4"></script>
-<script src="js/app.js?v=4"></script>
+<script src="js/crypto.js?v=7"></script>
+<script src="js/store.js?v=7"></script>
+<script src="js/i18n.js?v=7"></script>
+<script src="js/icons.js?v=7"></script>
+<script src="js/app.js?v=7"></script>
 </body>
 </html>
